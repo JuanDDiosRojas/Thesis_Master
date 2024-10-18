@@ -94,53 +94,53 @@ x0_param = torch.linspace(x0_i, x0_f, 100)
 #         b=x0_mesh[j] * (z_mesh[i]+1)**3
         
 #         mesh[i,j] =  abs(a-b)/abs(b) * 100.0
-mapas=[]
+# Lista para almacenar los mapas
+mapas = []
+min_val, max_val = float('inf'), float('-inf')  # Para rastrear el mínimo y el máximo global
+
+# Generamos los 4 mapas
 for k in range(4):
-    mesh=np.ones((100,100))
+    mesh = np.ones((100, 100))
     for i in range(100):
         for j in range(100):
-            #a=Param(torch.tensor([[z_param[i],x0_param[j]]]), net=redes[k]).detach().numpy()
-            a=redes[k](torch.tensor([[z_param[i],x0_param[j]]])).detach().numpy()
-            #b=sol_x([x0_mesh[j],1.0], [z_mesh[i]], 1.5, 3.0)
-            b=x0_mesh[j] * (z_mesh[i]+1)**3
-            
-            mesh[i,j] =  abs(a-b)/abs(b) * 100.0
+            # Evaluamos la red en la cuadrícula
+            a = redes[k](torch.tensor([[z_param[i], x0_param[j]]])).detach().numpy()
+            b = x0_mesh[j] * (z_mesh[i] + 1) ** 3
+            error = abs(a - b) / abs(b) * 100.0
+            mesh[i, j] = error
+
+            # Actualizamos el valor mínimo y máximo global
+            min_val = min(min_val, error)
+            max_val = max(max_val, error)
+
     mapas.append(mesh)
-
-
 
 # Creamos la figura y las subfiguras
 fig, axes = plt.subplots(2, 2, figsize=(10, 8))
-
-# Establecemos el título principal de la figura
 fig.suptitle('Error porcentual: $\Lambda-$CDM costo', fontsize=18)
 
+# Nombres de los gráficos para los diferentes nodos
+nod = ['20 nodos', '30 nodos', '50 nodos', '60 nodos']
+
 # Recorremos los mapas y los graficamos
-nod=['20 nodos', '30 nodos', '50 nodos', '60 nodos']
 for i in range(4):
     ax = axes[i // 2, i % 2]
     
-    # Graficamos el mapa de densidad
-    pcolormesh = ax.pcolormesh(z_mesh, x0_mesh, mapas[i], cmap='inferno')
-
-    # Añadimos la barra de color individual
-    #colorbar = plt.colorbar(pcolormesh, ax=ax)
-
+    # Graficamos el mapa de densidad, con un rango común en la escala de color
+    pcolormesh = ax.pcolormesh(z_mesh, x0_mesh, mapas[i], cmap='inferno', vmin=min_val, vmax=max_val)
+    
     # Personalizamos la subfigura
-    #ax.set_title(f"$\Omega_0 =$ {o0}")
     ax.set_title(nod[i])
-    if i==2 or i==3: ax.set_xlabel('$z$', size=16)
-    if i==0 or i==2: ax.set_ylabel('$\Omega_m$', size=16)
+    if i == 2 or i == 3: 
+        ax.set_xlabel('$z$', size=16)
+    if i == 0 or i == 2: 
+        ax.set_ylabel('$\Omega_m$', size=16)
 
+# Añadimos una barra de color común para todos los gráficos
 fig.colorbar(pcolormesh, ax=axes.ravel().tolist(), format='%1.1f%%')
-# colorbar = plt.colorbar(pcolormesh, format='%1.1f%%')
-# colorbar.ax.set_ylabel('error porcentual', size=18)
-# ax.set_xlabel('$z$', size=18)
-# ax.set_ylabel('$\Omega_{m,0}$', size=18)
-# ax.set_title('$\Lambda-CDM$ costo: 20 nodos', size=18)
+
 # Mostramos la gráfica
 plt.show()
-
 fig.savefig('LCDM_bench_20_30_50_60_cost_unabarra.pdf')
 
 ##########################################################################################
