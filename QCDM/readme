@@ -1,1 +1,27 @@
-QCDM model
+# QCDM Model - PINN Implementation
+
+This folder contains the implementation of Physics-Informed Neural Networks (PINNs) for solving the Klein-Gordon equation in the context of quintessence dark energy models. The goal is to reconstruct cosmological parameters without assuming initial conditions.
+
+## Folder Structure
+
+### Training and Model Implementation
+- `quintaesencia_datos.ipynb` → Trains the PINN for the quintessence model.
+
+### Visualization and Analysis
+- `rho_w_quintaesencia.ipynb` → Generates graphs of the model predictions in terms of redshift (z), using Cosmic Chronometer data for comparison.
+
+### Previous Versions (Reference)
+- `quintaesencia.ipynb`
+- `quintaesencia`
+
+These contain earlier versions of the model and serve as a reference.
+
+### Other Files
+- `readme` → Initial README file.
+
+## Running the Code
+
+### Training the Model
+Open and run:
+```bash
+jupyter notebook quintaesencia_datos.ipynb
