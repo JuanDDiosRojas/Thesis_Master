@@ -1,101 +1,98 @@
 import torch
 from scipy.integrate import odeint
 import numpy as np
-# def nth_derivative(net, x, n):
-#     """Esta función está creada para regresar la derivada temporal de la función ann, asumiendo que 
-#     la primer columna de x es el tiempo siempre
-#     x=[t, param_1, param_2,...] 
-    
-#     x debe ser un tensor: torch.Size([n, m])
 
-#     Para el buen funcionamiento: net(x)[0].shape = torch.Size([1])
-#     """
-#     x.requires_grad=True
-#     # Initialize the gradient tensor to 1.0, as the 0th derivative is the function itself.
-#     ann=net(x)
-#     grad_tensor = torch.ones(ann.size(), dtype=torch.float32, requires_grad=True)
-#     for _ in range(n):
-#         Dann=torch.autograd.grad(ann, x, grad_outputs=grad_tensor, create_graph=True)[0][:,0]
-#         Dann=Dann.reshape(ann.shape)
-#         ann=Dann
-#     return ann
-
-def nth_derivative(net, x:torch.Tensor, j:int, i:int ,n:int) -> torch.Tensor:
+def nth_derivative(net: torch.nn.Module, x: torch.Tensor, j: int, i: int, n: int) -> torch.Tensor:
     """
-    Esta función está creada para regresar la n-derivada de la componente j de la
-    función ann respecto de la variable i. 
-    
-    ann(x)=(ann_0(x), ann_1(x)...,ann_j(x)...).
-    
-    Con x=(x_0,x_1,...,x_i,...)
-    
-    x debe ser un tensor: torch.Size([n, m])
+    Computes the nth derivative of the j-th output of a neural network with respect to the i-th input variable.
 
-    Para el buen funcionamiento: net(x)[0].shape = torch.Size([1])
+    Parameters:
+        net (torch.nn.Module): Neural network model.
+        x (torch.Tensor): Input tensor of shape (n, m).
+        j (int): Index of the output component to differentiate.
+        i (int): Index of the input variable to differentiate with respect to.
+        n (int): Order of the derivative.
+
+    Returns:
+        torch.Tensor: Tensor containing the nth derivative of the selected output.
     """
-    x.requires_grad=True
-    # Initialize the gradient tensor to 1.0, as the 0th derivative is the function itself.
-    ann=net(x)[:,j].view(-1,1)
-    grad_tensor = torch.ones(ann.size(), dtype=torch.float32, requires_grad=True)
+    x.requires_grad = True
+    ann = net(x)[:, j].view(-1, 1)
+    grad_tensor = torch.ones_like(ann, requires_grad=True)
+    
     for _ in range(n):
-        Dann=torch.autograd.grad(ann, x, grad_outputs=grad_tensor, create_graph=True)[0][:,i]
-        Dann=Dann.reshape(ann.shape)
-        ann=Dann
+        ann = torch.autograd.grad(ann, x, grad_outputs=grad_tensor, create_graph=True)[0][:, i].view(-1, 1)
+    
     return ann
+
 ####################################################################################
-def oscilador(Y,t,delta,omega):
-  x,dx=Y
-  #queremos el arreglo [y,F]
-  #y=dx
-  #F nos la da la ecuación del oscilador
-  return [dx,-delta*dx - omega**2 * x]
+# Oscillator equations
+def oscilador(Y, t, delta, omega):
+    """
+    Defines the system of differential equations for a damped harmonic oscillator.
 
-# #Condiciones del sistema:
-# y0=[0,1] #[x0,y0]
-# delta,omega = 0.8,5 #parametros libres
-# t = np.linspace(0, 10, 100) #tiempo
+    Parameters:
+        Y (list): List containing position x and velocity dx/dt.
+        t (float): Time variable.
+        delta (float): Damping coefficient.
+        omega (float): Angular frequency.
 
-#la función sol del sistema
+    Returns:
+        list: First derivative [dx/dt, d^2x/dt^2].
+    """
+    x, dx = Y
+    return [dx, -delta * dx - omega**2 * x]
+
 def sol_x(y0, t, delta, omega):
-   return odeint(oscilador, y0, t, args=(delta, omega))[:,0]
+    """
+    Computes the numerical solution of the oscillator system using scipy's ODE solver.
 
-#############################################################################
-# # Parámetros del oscilador
-# m = 1.0  # Masa
-# k = 10.0  # Constante de elasticidad
-# c = 1.0  # Constante de amortiguamiento
+    Parameters:
+        y0 (list): Initial conditions [x0, dx0].
+        t (numpy.ndarray): Time array.
+        delta (float): Damping coefficient.
+        omega (float): Angular frequency.
 
-# # Condiciones iniciales
-# x0 = 1.0  # Posición inicial
-# v0 = 0.0  # Velocidad inicial
+    Returns:
+        numpy.ndarray: Solution for x(t).
+    """
+    return odeint(oscilador, y0, t, args=(delta, omega))[:, 0]
 
-# # Función derivada del oscilador
-# def f(y, t):
-#     x, v = y
-#     return np.array([v, -c / m * v - k / m * x])
-
-# # Tiempo de integración
-# t_max = 10.0
-# t = np.linspace(0.0, t_max, 1000)
-
-# # Solución del oscilador
-# y = odeint(f, [x0, v0], t)
 #####################################################################
-def Param(T:torch.Tensor,net: torch.nn.Sequential) -> torch.Tensor:
-    ti=0.0
+def Param(T: torch.Tensor, net: torch.nn.Module) -> torch.Tensor:
+    """
+    Reparametrization function for a neural network to ensure physical constraints.
+
+    Parameters:
+        T (torch.Tensor): Input tensor with shape (n, 2) containing independent variables.
+        net (torch.nn.Module): Neural network model.
+
+    Returns:
+        torch.Tensor: Reparametrized output.
+    """
+    ti = 0.0
     out = net(T)
-    a=(T[:,0]-ti)*1.0
-    b=1-torch.exp(ti-T[:,0])
-    #return torch.reshape(T[:,1],out.size()) + b*out
-    return T[:,1].view(-1,1) +a.view(-1,1) +b.view(-1,1)**2 * out
+    a = (T[:, 0] - ti) * 1.0
+    b = 1 - torch.exp(ti - T[:, 0])
+    
+    return T[:, 1].view(-1, 1) + a.view(-1, 1) + (b.view(-1, 1) ** 2) * out
+
 ###################################################################
-def Param_dirich(T:torch.Tensor,net:any, ti:float)->torch.Tensor:
-    '''This is the reparametrization of the ANN to meet the Dirichlet conditions
-    T: is the tensor to be evaluated, T=T[t,x0]
-    net: is the neural network 
-    ti: the time such as ANN(ti)=x0
-    '''
+def Param_dirich(T: torch.Tensor, net: torch.nn.Module, ti: float) -> torch.Tensor:
+    """
+    Reparametrization to enforce Dirichlet boundary conditions on the neural network output.
+
+    Parameters:
+        T (torch.Tensor): Input tensor of shape (n, 2) where T[:, 0] is the independent variable (time).
+        net (torch.nn.Module): Neural network model.
+        ti (float): Reference time where ANN(ti) = x0.
+
+    Returns:
+        torch.Tensor: Reparametrized output satisfying the Dirichlet condition.
+    """
     out = net(T)
-    b=1-torch.exp(ti-T[:,0])
-    return T[:,1].view(-1,1) +b.view(-1,1)*out
+    b = 1 - torch.exp(ti - T[:, 0])
+    
+    return T[:, 1].view(-1, 1) + b.view(-1, 1) * out
+
 
