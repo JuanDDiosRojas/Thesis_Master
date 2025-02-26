@@ -1,1 +1,28 @@
-CPL model
+# CPL Model - PINN Implementation
+
+This folder contains the implementation of Physics-Informed Neural Networks (PINNs) applied to the CPL (Chevallier-Polarski-Linder) dark energy parametrization. The goal is to approximate the luminosity distance integral and perform parameter inference.
+
+## Folder Structure
+
+### Training Scripts
+- `train_CPL.py` → Trains the PINN to approximate the luminosity distance.
+
+### Benchmarking & Error Analysis
+- `CPL_benchmarking_2.py` → Generates error maps and compares PINN predictions with the analytical solution.
+
+### Inference and Model Evaluation
+- `inferencia.ipynb` → Jupyter Notebook used to perform parameter inference and analyze trained models.
+
+### Pretrained Models
+These are trained models used in the thesis:
+- `CPL_param30_inferencia`
+- `CPL_param_dict`
+
+These can be loaded for predictions without retraining.
+
+## Running the Code
+
+### Training a Model
+Run:
+```bash
+python train_CPL.py
