@@ -2,159 +2,120 @@ import torch
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.integrate import odeint
-# import mplcyberpunk
-# import tqdm
-from functions import nth_derivative#, Param_dirich
-# plt.style.use('cyberpunk')
+import os
 from scipy.integrate import quad
 
-#importing model
-nodos=20
-ANN_CPL =  nn.Sequential(nn.Linear(3, nodos), nn.Tanh(), nn.Linear(nodos,nodos),
-                    nn.Tanh(), nn.Linear(nodos,nodos),
-                    #nn.Tanh(), nn.Linear(nodos,nodos),
-                    #nn.Tanh(), nn.Linear(nodos,nodos),
-                    # nn.Tanh(), nn.Linear(nodos,nodos)
-                    nn.Tanh(),nn.Linear(nodos,1))
+# Check if CUDA is available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-ANN_CPL.load_state_dict(torch.load('CPL_param_dict_50'))
-ANN_CPL.eval()
+# Load trained model
+def load_model(filename, n_nodes=20):
+    """Loads a trained PyTorch model if available."""
+    if os.path.exists(filename):
+        model = nn.Sequential(
+            nn.Linear(3, n_nodes), nn.Tanh(),
+            nn.Linear(n_nodes, n_nodes), nn.Tanh(),
+            nn.Linear(n_nodes, n_nodes), nn.Tanh(),
+            nn.Linear(n_nodes, 1)
+        ).to(device)
+        model.load_state_dict(torch.load(filename, map_location=device))
+        model.eval()
+        return model
+    else:
+        print(f"Warning: {filename} not found.")
+        return None
 
-#Domain intervals
-zi=0.0
-zf=3.0
+ANN_CPL = load_model('CPL_param_dict_50')
 
-omega_0i=-2.0
-omega_0f=0.0
+# Define domain intervals
+zi, zf = 0.0, 3.0
+omega_0i, omega_0f = -2.0, 0.0
+omega_ai, omega_af = -2.0, 2.0
 
-omega_ai=-2.0
-omega_af=2.0
+# Define real solution
+Omega_m0, Omega_Lambda0 = 0.3, 0.7
 
-#########################   real solution   #####################################
-# Definimos los parámetros cosmológicos
-Omega_m0 = 0.3
-Omega_Lambda0 = 0.7
-omega_0 = 1.0
-omega_a = 1.0
-
-# Función a integrar
-def integrand(z):
+def integrand(z, omega_0, omega_a):
     return 1 / np.sqrt(Omega_m0 * (1 + z)**3 + Omega_Lambda0 * (1 + z)**(3 * (1 + omega_0 + omega_a)) * np.exp(-3 * omega_a * z / (1 + z)))
 
-
-def DL(z):
-    # Límite inferior de la integral
-    z_min = 0.0
-
-    # Límite superior de la integral
-    #z_max = 3.0
-
-    # Vector de valores de z
-    #z = np.linspace(z_min, z_max, 100)
-
-    # Vector de soluciones de la integral
-    resultado = np.zeros_like(z)
-
-    # Calculamos la integral para cada valor de z
+def DL(z, omega_0, omega_a):
+    """Computes the theoretical luminosity distance."""
+    result = np.zeros_like(z)
     for i in range(len(z)):
-        resultado[i], _ = quad(integrand, z_min, z[i])
-    return resultado
+        result[i], _ = quad(integrand, 0, z[i], args=(omega_0, omega_a))
+    return result
 
-#Parametrization
-def Param(T,net=ANN_CPL,ti=zi):
+# Define reparametrization function
+def Param(T, net=ANN_CPL, ti=zi):
+    """Reparametrization of the network output."""
     out = net(T)
-    b=1-torch.exp(ti-T[:,0].view(-1,1))
-    return 0.0 + b.view(-1,1)*out
+    b = 1 - torch.exp(ti - T[:, 0].view(-1, 1))
+    return b * out
 
-##########################################################################
-#solución real
-omega_0 = 0.0
-omega_a = -1.0
-z=np.linspace(0,3,40)
-plt.plot(z,DL(z))
+# Generate test data
+z_test = np.linspace(zi, zf, 40)
+omega_0_test, omega_a_test = 0.0, -1.0
+plt.plot(z_test, DL(z_test, omega_0_test, omega_a_test), label="Real Solution")
 
+z0 = torch.linspace(zi, zf, 60, device=device)
+Omega0 = torch.full_like(z0, omega_0_test, device=device)
+Omegaa = torch.full_like(z0, omega_a_test, device=device)
+X_test = torch.cat((z0.view(-1, 1), Omega0.view(-1, 1), Omegaa.view(-1, 1)), dim=1)
 
-z0 = torch.linspace(zi,zf,60)
-Omega0 = omega_0*torch.ones([z0.shape[0],1])
-Omegaa = omega_a*torch.ones([z0.shape[0],1])
-#v0 = vel_ini*torch.ones([t0.shape[0],1])
-# delta0 = d*torch.ones([t0.shape[0],1])
-# omega0 = omega*torch.ones([t0.shape[0],1])
+if ANN_CPL:
+    plt.plot(z0.cpu().numpy(), Param(X_test).detach().cpu().numpy(), '--r', label='PINN')
 
-X=torch.cat((z0.view(-1,1),Omega0,Omegaa),1)
-#X.cuda()
-#plt.plot(t0, -torch.sin(t0)+2*t0+pos_ini, label='solución real')
-#plt.plot(z0.detach(), sol_x([pos_ini,vel_ini], t0, d, omega), label='solución real')
-#plt.plot(z0,pos_ini * (z0+1)**3, label='Solution')
-plt.plot(z0,Param(X).detach().numpy(),'--r', label='PINN')
+plt.legend()
+plt.xlabel("Redshift (z)")
+plt.ylabel("Luminosity Distance")
+plt.title("Comparison of PINN and Analytical Solution")
 plt.show()
 
-############################################################################
-
-#Grid for the percent error
+# Generate error maps
 z_mesh = np.linspace(zi, zf, 100)
-O0_mesh = [-2.0,-1.5,-1.0,0.0]
+O0_mesh = [-2.0, -1.5, -1.0, 0.0]
 Oa_mesh = np.linspace(omega_ai, omega_af, 100)
 
-z_param = torch.linspace(zi, zf, 100)
-#O0_param = torch.linspace(x0_i, x0_f, 100)
-Oa_param = torch.linspace(omega_ai, omega_af, 100)
+z_param = torch.linspace(zi, zf, 100, device=device)
+Oa_param = torch.linspace(omega_ai, omega_af, 100, device=device)
 
-mesh=np.ones((100,100))
+error_maps = []
+min_error, max_error = float('inf'), float('-inf')
 
-#The 4 grids to plot for diferents values
-# Lista para almacenar los mapas
-mapas = []
-min_val, max_val = float('inf'), float('-inf')  # Para rastrear el mínimo y el máximo global
+if ANN_CPL:
+    for O0i in O0_mesh:
+        error_map = np.ones((100, 100))
+        for i in range(100):
+            for j in range(100):
+                input_tensor = torch.tensor([[z_param[i], O0i, Oa_param[j]]], dtype=torch.float32, device=device)
+                y_pred = Param(input_tensor, net=ANN_CPL).detach().cpu().numpy()
+                y_actual = DL([z_mesh[i]], O0i, Oa_mesh[j])
+                
+                error = abs(y_pred - y_actual) / abs(y_actual) * 100.0
+                error_map[i, j] = error
 
-# Generamos los mapas
-for O0i in O0_mesh:
-    mesh = np.ones((100, 100))
-    for i in range(100):
-        for j in range(100):
-            # Evaluamos la red en la cuadrícula
-            a = Param(torch.tensor([[z_param[i], O0i, Oa_param[j]]]), net=ANN_CPL).detach().numpy()
-            omega_0 = O0i
-            omega_a = Oa_mesh[j]
-            b = DL([z_mesh[i]])  # Función que define el valor teórico
-            
-            error = abs(a - b) / abs(b) * 100.0
-            mesh[i, j] = error
-            
-            # Actualizamos el valor mínimo y máximo global
-            min_val = min(min_val, error)
-            max_val = max(max_val, error)
-    
-    mapas.append(mesh)
+                min_error = min(min_error, error)
+                max_error = max(max_error, error)
+        
+        error_maps.append(error_map)
 
-# Creamos la figura y las subfiguras
+# Plot error maps
 fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+fig.suptitle('Error Map: CPL Model (20 Nodes)', fontsize=18)
 
-# Establecemos el título principal de la figura
-fig.suptitle('Error porcentual: CPL 20 nodos', fontsize=18)
-
-# Recorremos los mapas y los graficamos
 for i, o0 in enumerate(O0_mesh):
     ax = axes[i // 2, i % 2]
-    
-    # Graficamos el mapa de densidad, con un rango común en la escala de color
-    pcolormesh = ax.pcolormesh(z_mesh, Oa_mesh, mapas[i], cmap='inferno', vmin=min_val, vmax=max_val)
-    
-    # Personalizamos la subfigura
-    ax.set_title(f"$\Omega_0 =$ {o0}")
-    if i == 2 or i == 3: 
+    mesh_plot = ax.pcolormesh(z_mesh, Oa_mesh, error_maps[i], cmap='inferno', vmin=min_error, vmax=max_error)
+    ax.set_title(f"$\omega_0 =$ {o0}")
+    if i in [2, 3]: 
         ax.set_xlabel('$z$', size=16)
-    if i == 0 or i == 2: 
+    if i in [0, 2]: 
         ax.set_ylabel('$\omega_a$', size=16)
 
-# Añadimos una barra de color común para todos los gráficos
-fig.colorbar(pcolormesh, ax=axes.ravel().tolist(), format='%1.3f%%')
-
-# Mostramos la gráfica
+fig.colorbar(mesh_plot, ax=axes.ravel().tolist(), format='%1.3f%%')
 plt.show()
+fig.savefig('CPL_ErrorMaps.pdf', dpi=300)
 
-fig.savefig('CPL20_final.pdf')
 
 
 
