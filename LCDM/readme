@@ -1,1 +1,38 @@
-LCDM model
+# ΛCDM Model - PINN Implementation
+
+This folder contains the implementation of Physics-Informed Neural Networks (PINNs) applied to the ΛCDM cosmological model. The goal is to solve the differential equations that describe the evolution of the universe using two different approaches:
+
+1. Reparametrization approach: The neural network satisfies initial conditions by construction.
+2. Cost function approach: The initial conditions are enforced through the loss function.
+
+## Folder Structure
+
+### **Training Scripts**
+- `train_LCDM.py` → Trains the PINN using the reparametrization approach.
+- `train_LCDM_cost.py` → Trains the PINN using the cost function approach.
+
+### **Benchmarking & Error Analysis**
+- `LCDM_benchmarking.py` → Generates error maps for models trained with the reparametrization approach.
+- `LCDM_bench_cost.py` → Generates error maps for models trained with the cost function approach.
+
+### **Pretrained Models**
+The following `.pt` files contain trained neural networks with different architectures (different number of hidden nodes). These models were used in the thesis and can be loaded for inference:
+
+- `L-CDM_param_60`
+- `L-CDM_param_dict`
+- `L-CDM_param_dict_30`
+- `L-CDM_param_dict_50`
+- `LCDM_cost15`
+- `LCDM_cost20`
+- `LCDM_cost20_100z`
+- `LCDM_cost25_100_1z`
+- `LCDM_cost25_100z`
+
+## Running the Code
+
+### **Training a New Model**
+To train a new model, run:
+```bash
+python train_LCDM.py          # Reparametrization approach
+python train_LCDM_cost.py      # Cost function approach
+
