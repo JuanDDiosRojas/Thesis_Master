@@ -1,0 +1,17 @@
+# Physics-Informed Neural Networks for Cosmology
+
+This repository contains implementations of Physics-Informed Neural Networks (PINNs) applied to different cosmological models. The goal is to solve differential equations relevant to cosmology without requiring predefined initial conditions.
+
+## Folder Structure
+
+- `CPL/` → PINN implementation for the Chevallier-Polarski-Linder (CPL) dark energy parametrization.
+- `LCDM/` → PINN implementation for the ΛCDM model, comparing reparametrization and cost function approaches.
+- `QCDM/` → PINN implementation for quintessence models, solving the Klein-Gordon equation.
+- `functions.py` → Contains utility functions used across the different models.
+
+Each folder contains its own README with specific details on running the code.
+
+## Requirements
+Install dependencies with:
+```bash
+pip install torch numpy scipy matplotlib tqdm
